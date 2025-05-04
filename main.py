@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
 import uvicorn
 import os
 from utils.getDoc import load_vectorstore, create_vectorstore
@@ -7,13 +8,16 @@ from utils.getLLM import getLLM
 from utils.getChain import getChain
 from pydantic import BaseModel
 
-# Initialize components
-retriever = load_vectorstore()
-prompt_template = getPromptTemplate()
-llm = getLLM()
-chain = getChain(retriever, prompt_template, llm)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    retriever = load_vectorstore()
+    prompt_template = getPromptTemplate()
+    llm = getLLM()
+    app.state.chain = getChain(retriever, prompt_template, llm)
+    yield
 
-app = FastAPI(title="Portfolio Bot API")
+
+app = FastAPI(title="Portfolio Bot API", lifespan=lifespan)
 
 class ChatRequest(BaseModel):
     question: str
@@ -25,16 +29,16 @@ async def root():
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
-        result = chain.invoke({"question": request.question})
+        result = app.state.chain.invoke({"question": request.question})
         return {"answer": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
-    
+
 @app.get("/vector-store-rerun")
 async def vector_store_rerun():
     try:
         create_vectorstore()
-        return {"message":"vector store successfuly created!"}
+        return {"message": "Vector store successfully created!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
