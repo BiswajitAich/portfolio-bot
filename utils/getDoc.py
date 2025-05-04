@@ -8,8 +8,9 @@ def sanitize_metadata(metadata: dict):
     for key, value in metadata.items():
         if isinstance(value, list):
             metadata[key] = ", ".join(map(str, value))
+        elif isinstance(value, dict):
+            metadata[key] = ", ".join(f"{k}: {v}" for k, v in value.items())
     return metadata
-
 
 def create_vectorstore(persist_dir="chroma_db/"):
     model = "sentence-transformers/paraphrase-MiniLM-L3-v2"
