@@ -8,7 +8,6 @@ from utils.getLLM import getLLM
 from utils.getChain import getChain
 from pydantic import BaseModel
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     retriever = load_vectorstore()
@@ -30,10 +29,22 @@ async def root():
     return {"message": "portfolio-bot is live!"}
 
 
+@app.get("/health")
+async def health():
+    try:
+        _ = app.state.chain
+        return {"status": "ok"}
+    except AttributeError:
+        raise HTTPException(status_code=503, detail="Backend is loading")
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
-        result = app.state.chain.invoke({"question": request.question})
+        if hasattr(app.state.chain, "ainvoke"):
+            result = await app.state.chain.ainvoke({"question": request.question})
+        else:
+            result = app.state.chain.invoke({"question": request.question})
         return {"answer": result}
     except Exception as e:
         raise HTTPException(
